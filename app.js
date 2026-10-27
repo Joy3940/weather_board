@@ -11,7 +11,8 @@ const SAMPLE_TASKS = [
 ];
 
 let tasks = [];
-let weatherByRegion = {};   // 03 단원에서 지역별 날씨를 넣음
+const weatherByRegion = {};
+const windTest = new URLSearchParams(window.location.search).get('test') === 'wind';
 
 function loadTasks() {
   const saved = JSON.parse(localStorage.getItem('wx_added') || '[]');
@@ -59,12 +60,39 @@ function addTask(e) {
   renderTasks();
 }
 
-const today = new Date();
-const todayText = [
-  today.getFullYear(),
-  String(today.getMonth() + 1).padStart(2, '0'),
-  String(today.getDate()).padStart(2, '0'),
-].join('-');
+async function loadWeather() {
+  const status = document.getElementById('weatherStatus');
+  const regions = Object.keys(REGIONS);
+  const failed = [];
+  let completed = 0;
+  const testNotice = windTest ? ' · 강풍 시험: 수신한 풍속을 12m/s로 변경' : '';
+  status.textContent = '오늘 날씨를 불러오는 중…' + testNotice;
+
+  await Promise.all(regions.map(async region => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000);
+    try {
+      const response = await fetch(weatherUrl(region), { signal: controller.signal });
+      if (!response.ok) throw new Error('날씨 API 오류: ' + response.status);
+      const weather = parseWeather(await response.json());
+      if (windTest) weather.windMax = 12;
+      weatherByRegion[region] = weather;
+    } catch (error) {
+      failed.push(region);
+    } finally {
+      clearTimeout(timer);
+      completed += 1;
+      renderTasks();
+      const loaded = Object.keys(weatherByRegion).length;
+      status.textContent = `오늘 날씨 ${loaded}/${regions.length}개 지역 수신` +
+        (completed < regions.length ? ' · 불러오는 중…' : '') +
+        (failed.length ? ` · ${failed.join(' · ')} 날씨를 받지 못했습니다. 새로고침해 주세요.` : '') +
+        testNotice;
+    }
+  }));
+}
+
+const todayText = koreaDate();
 const todayDate = document.getElementById('todayDate');
 todayDate.textContent = todayText;
 todayDate.dateTime = todayText;
@@ -72,3 +100,4 @@ todayDate.dateTime = todayText;
 document.getElementById('taskForm').addEventListener('submit', addTask);
 loadTasks();
 renderTasks();
+loadWeather();
