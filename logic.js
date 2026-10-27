@@ -58,6 +58,29 @@ function judge(kind, w) {
   return { level: 'ok', text: '진행' };
 }
 
+// 화면에서 읽은 표 데이터를 Markdown으로 바꾼다. DOM이나 다운로드는 다루지 않는다.
+function judgmentMarkdown(headers, rows, date) {
+  const cell = value => String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\\/g, '&#92;')
+    .replace(/[|]/g, '&#124;')
+    .replace(/[`*_\[\]]/g, character => '&#' + character.charCodeAt(0) + ';')
+    .replace(/\r\n|\r|\n/g, '<br>');
+  const line = values => '| ' + values.map(cell).join(' | ') + ' |';
+  return [
+    '# 현장 일정 판단 — ' + date,
+    '',
+    line(headers),
+    '| ' + headers.map(() => '---').join(' | ') + ' |',
+    ...rows.map(line),
+    '',
+    `판단 기준(교육용 가상 기준): 고소 일정 최대 풍속 ${RULES.wind}m/s 이상 → 중지 검토 · 강수확률 ${RULES.rain}% 이상 → 우천 주의 · 최고 기온 ${RULES.heat}℃ 이상 → 폭염 휴식`,
+    '',
+  ].join('\n');
+}
+
 if (typeof module !== 'undefined') {
-  module.exports = { REGIONS, RULES, koreaDate, weatherUrl, parseWeather, judge };
+  module.exports = { REGIONS, RULES, koreaDate, weatherUrl, parseWeather, judge, judgmentMarkdown };
 }
